@@ -1,0 +1,52 @@
+# Натуральные числа. Выводит на экран четные числа, содержащие количество вхождений цифры, введенной с клавиатуры, большее К.  Список используемых цифр выводится прописью.
+
+
+number_to_words = {
+    '0': 'ноль',
+    '1': 'один',
+    '2': 'два',
+    '3': 'три',
+    '4': 'четыре',
+    '5': 'пять',
+    '6': 'шесть',
+    '7': 'семь',
+    '8': 'восемь',
+    '9': 'девять'
+}
+
+work_buffer_len = buffer_len = 1  # размер буфера чтения
+work_buffer = ""  # рабочий буфер
+counter = index = 0
+
+k = int(input('Введите количество вхождений: '))
+number = int(input('Введите число вхождений: '))
+
+with open("text.txt", "r") as file:
+
+    buffer = file.read(buffer_len)  # читаем первый блок
+    if not buffer:  # если файл пустой
+        print(
+            "\nФайл text.txt пустой.\n Добавьте не пустой файл в директорию или переименуйте существующий *.txt файл.")
+
+    while buffer:
+        while '0' <= buffer <= '9':  # обрабатываем текущий блок
+            work_buffer += buffer
+            buffer = file.read(buffer_len)  # читаем очередной блок
+
+        if len(work_buffer) > 0:
+            output = ""
+            counter = 0
+            for letter in work_buffer:
+                output += letter
+                if letter == str(number):
+                    counter += 1
+
+            if counter > k and int(output) % 2 == 0:
+                print(work_buffer)
+                for digit in output:
+                    print(number_to_words[digit], end=" ")
+                print()
+
+            work_buffer = ""
+
+        buffer = file.read(buffer_len)
