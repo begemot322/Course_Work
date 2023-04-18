@@ -1,0 +1,27 @@
+import re
+
+digits = ['ноль',
+          'один',
+          'два',
+          'три',
+          'четыре',
+          'пять',
+          'шесть',
+          'семь',
+          'восемь',
+          'девять']
+
+digit = int(input('Введите цифру: '))
+k = 2
+
+with open("begemot123.txt", "r") as file:
+    buffer = file.readlines()
+    if not buffer:
+        print("File is empty!")
+    else:
+        for block in buffer:
+            numbers = re.findall(r'\d+', block)
+            for number in numbers:
+                if int(number) % 2 == 0 and str(number).count(str(digit)) > k:
+                    print(' '.join(digits[int(digit)] for digit in str(number)))
+                    print(str(number))
