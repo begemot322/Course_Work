@@ -1,27 +1,38 @@
 import re
+number_to_words = {
+    '0': 'ноль',
+    '1': 'один',
+    '2': 'два',
+    '3': 'три',
+    '4': 'четыре',
+    '5': 'пять',
+    '6': 'шесть',
+    '7': 'семь',
+    '8': 'восемь',
+    '9': 'девять'
+}
+n = 3           # сколько раз найти число k
+k = 1           # число которое мы ищем
 
-digits = ['ноль',
-          'один',
-          'два',
-          'три',
-          'четыре',
-          'пять',
-          'шесть',
-          'семь',
-          'восемь',
-          'девять']
-
-digit = int(input('Введите цифру: '))
-k = 2
+regex = r"\b"
+for i in range(n):
+    regex += r"\d*" +str(k)
+regex += r"\d*\b"
 
 with open("begemot123.txt", "r") as file:
-    buffer = file.readlines()
-    if not buffer:
-        print("File is empty!")
-    else:
-        for block in buffer:
-            numbers = re.findall(r'\d+', block)
+    while True:
+        buffer = file.readline()
+
+        if not buffer:
+            print("File is empty!")
+            break
+
+        numbers = re.findall(regex, buffer)
+
+        if numbers:
             for number in numbers:
-                if int(number) % 2 == 0 and str(number).count(str(digit)) > k:
-                    print(' '.join(digits[int(digit)] for digit in str(number)))
-                    print(str(number))
+                if int(number) % 2 == 0:
+                    print(number)
+                    for digit in number:
+                        print(number_to_words[digit], end=" ")
+                    print()
