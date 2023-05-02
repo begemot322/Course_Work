@@ -89,12 +89,6 @@ new_A = []
 for i in range(size):
     new_A.append(E[i] + B[i])
     new_A.append(D[i] + C[i])
-# Формируем новую матрицу из подматриц
-new_A = []
-for i in range(size):
-    new_A.append(E[i] + B[i])
-for i in range(size):
-    new_A.append(D[i] + C[i])
 
 # Выводим матрицу А
 print("Матрица А:")
