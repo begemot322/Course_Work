@@ -84,10 +84,11 @@ for row in range(size):
     E.append(row_e)
 
 
-# Формируем новую матрицу, располагая подматрицы в нужном порядке
+# Формируем новую матрицу из подматриц
 new_A = []
 for i in range(size):
     new_A.append(E[i] + B[i])
+for i in range(size):
     new_A.append(D[i] + C[i])
 
 # Выводим матрицу А
