@@ -1,0 +1,92 @@
+# Задана рекуррентная функция. Область определения функции – натуральные числа.
+# Написать программу сравнительного вычисления данной функции рекурсивно и
+# итерационно. Определить (смоделировать) границы применимости рекурсивного и
+# итерационного подхода. Результаты сравнительного исследования времени вычисления
+# представить в табличной и графической форме в виде отчета по лабораторной работе.
+# 12.F(n<5)= 100; F(n) = -5F(n-1)-7(n-2)+ F(n//5)(при n>12), F(n)=F(n-2) *F(n-1) (при 5<n<=12)
+
+import time
+import matplotlib.pyplot as plt
+
+# рекурсивное решение
+def recursive_f(n):
+    if n < 5:
+        return 100
+    elif 5 < n <= 12:
+        return recursive_f(n - 2) * recursive_f(n - 1)
+    else:
+        return -5 * recursive_f(n - 1) - 7 * (n - 2) + recursive_f(n // 5)
+
+
+def iter_f(n):
+    if n < 5:
+        return 100
+
+    f_minus_2 = 100
+    f_minus_1 = 100
+    result = 0
+
+    for n in range(5, n + 1):
+        if 5 < n <= 12:
+            result = f_minus_2 * f_minus_1
+        else:
+            result = -5 * f_minus_1 - 7 * (n - 2) + iter_f(n // 5)
+
+        f_minus_2 = f_minus_1
+        f_minus_1 = result
+
+    return result
+
+
+
+try:
+    n = int(input('Введите натуральное число n : '))
+
+    k = 1
+    if n > 500:
+        k = int(input("Число n > 500. Хотите продолжить ? Это займет много времени. (Да: 1 / Нет: 0):"))
+
+    if k == 1:
+
+        recursive_times = []  # создание списков для дальнейшего построения таблицы
+        recursive_values = []
+        iterative_times = []
+        iterative_values = []
+        n_values = list(range(2, n + 1))
+
+        for n in n_values:  # заполнение списков данными
+
+            start = time.time()
+            recursive_values.append(recursive_f(n))
+            end = time.time()
+            recursive_times.append(end - start)
+
+            start = time.time()
+            iterative_values.append(iter_f(n))
+            end = time.time()
+            iterative_times.append(end - start)
+
+        table_data = []  # создание и заполнение последующей таблицы
+        for i, n in enumerate(n_values):
+            table_data.append([n, recursive_times[i], iterative_times[i], recursive_values[i], iterative_values[i]])
+
+        print('{:<7}|{:<25}|{:<25}|{:<25}|{:<25}'.format('n', 'Время рекурсии (с)', 'Время итерации (с)',
+                                                         'Значение рекурсии', 'Значение итерации'))  # вывод таблицы
+        print('-' * 105)
+        for data in table_data:
+            print('{:<7}|{:<25}|{:<25}|{:<25}|{:<25}'.format(data[0], data[1], data[2], data[3], data[4]))
+
+        plt.plot(n_values, iterative_times, label='Итерация')
+        plt.plot(n_values, recursive_times, label='Рекурсия')  # вывод графиков
+        plt.xlabel('n')
+        plt.ylabel('Время (с)')
+        plt.title('Сравнение рекурсивного и итерационного подхода')
+        plt.legend()
+        plt.show()
+
+    print("\nРабота программы завершена.\n")
+except ValueError:
+    print("\nВы ввели число, не следуя условиям. Перезапустите программу и введите число, следуя инструкциям.")
+
+except RecursionError:
+    print("\nВы превысили относительную максимальную глубину рекурсии.")
