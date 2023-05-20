@@ -1,0 +1,65 @@
+K = int(input("Введите количество видов рождественских открыток: "))
+N = int(input("Введите количество открыток, которые нужно купить: "))
+def generate_combinations(K, N):
+    all_combinations = []
+
+    def comb(current_combo, now_cards, last_card):
+        if now_cards == 0:
+            all_combinations.append(current_combo)
+            return
+
+        for i in range(last_card, K + 1):
+            new_combo = current_combo + [i]
+            comb(new_combo, now_cards - 1, i)
+
+    comb([], N, 1)
+    return all_combinations
+
+combinations = generate_combinations(K, N)
+for combo in combinations:
+    print(combo)
+
+#2 часть усложненная часть. Теперь у каждой открытки есть своя цена и она не должна привышать твой бюджет. Каждая открытка максимум 2 раза покупается.
+LIMIT = 2  # максимальное количество открыток каждого вида, которое можно купить
+max_sum = int(input("Введите максимальную сумму, которую вы можете потратить: "))
+card_prices = []
+for i in range(K):
+    price = int(input(f"Введите цену для открытки номер {i + 1}: "))
+    card_prices.append(price)
+def generate_combinations(K, N, card_prices, max_sum):
+    all_combinations = []
+
+    def comb(current_combo, now_cards, last_card, current_sum):
+        if now_cards == 0 and current_sum <= max_sum:
+            all_combinations.append(current_combo)
+            return
+
+        for i in range(last_card, K + 1):
+            if current_combo.count(i) >= LIMIT:
+                continue
+
+            new_combo = current_combo + [i]
+            new_sum = current_sum + card_prices[i - 1]
+
+            if new_sum > max_sum:
+                break
+
+            comb(new_combo, now_cards - 1, i, new_sum)
+
+    comb([], N, 1, 0)
+    return all_combinations
+
+combinations = generate_combinations(K, N, card_prices, max_sum)
+
+if len(combinations)==0:
+    print("Невозможно купить открытки с заданными параметрами")
+else:
+    for combo in combinations:
+        total_price = 0
+        for i in combo:
+            total_price += card_prices[i - 1]
+        cards_output = ""
+        for card in combo:
+            card_output = f"Открытка {card} ({card_prices[card - 1]} руб.)"
+            cards_output += card_output + "\n"
+        print(f"Сумма покупки: {total_price} руб.\n{cards_output}")
