@@ -47,9 +47,6 @@ comboes=[]
 
 
 def generate_combo_2(K, N, max_sum):
-    card_types = []  # Количество видов открыток
-    for i in range(1, K + 1):
-        card_types.append(i)
     comboes = []
     for num_cards in range(1, N + 1):
         card_types = []  # Количество видов открыток
