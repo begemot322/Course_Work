@@ -1,0 +1,644 @@
+import os
+import tkinter as tk  # Библиотека для реализации интерфейса
+from tkinter import messagebox
+from enum import auto, Enum  # Библиотека для реализации перечислений
+from math import inf
+from random import choice  # Библиотека для реализации случайного выбора
+
+from PIL import ImageTk
+from PIL import Image
+
+
+# Класс типа стороны игрока
+class SideType(Enum):
+    WHITE = auto()
+    BLACK = auto()
+
+    # Противоположный тип
+    def opposite(self):
+        return SideType.BLACK if self == SideType.WHITE else SideType.WHITE
+
+
+# Класс типа шашки
+class CheckerType(Enum):
+    NONE = auto()
+    WHITE_STANDARD = auto()
+    BLACK_STANDARD = auto()
+    WHITE_QUEEN = auto()
+    BLACK_QUEEN = auto()
+
+
+# Класс точки
+class Point:
+    def __init__(self, x=-1, y=-1):
+        self.x = x
+        self.y = y
+
+    def __eq__(self, other):
+        return (self.x == other.x and
+                self.y == other.y)
+
+
+# Количество ходов для minmax функции (чем больше, тем сильнее противник)
+MINMAX_DEPTH = 3
+
+# Возможные dx и dy шашек
+MOVE_OFFSETS = [
+    Point(-1, -1),
+    Point(1, -1),
+    Point(-1, 1),
+    Point(1, 1)
+]
+
+# Типы белых и чёрных шашек
+WHITE_CHECKERS = [CheckerType.WHITE_STANDARD, CheckerType.WHITE_QUEEN]
+BLACK_CHECKERS = [CheckerType.BLACK_STANDARD, CheckerType.BLACK_QUEEN]
+
+
+# Класс шашки
+class Checker:
+    def __init__(self, type=CheckerType.NONE):
+        self.type = type
+
+    # Белая ли шашка
+    def is_white(self):
+        return self.type == CheckerType.WHITE_STANDARD or self.type == CheckerType.WHITE_QUEEN
+
+    # Черная ли шашка
+    def is_black(self):
+        return self.type == CheckerType.BLACK_STANDARD or self.type == CheckerType.BLACK_QUEEN
+
+    # Символ шашки
+    def symbol(self):
+        if self.type == CheckerType.WHITE_STANDARD:
+            return 'w'
+        if self.type == CheckerType.WHITE_QUEEN:
+            return 'W'
+        if self.type == CheckerType.BLACK_STANDARD:
+            return 'b'
+        if self.type == CheckerType.BLACK_QUEEN:
+            return 'B'
+        return ' '
+
+
+# Класс доски
+class Field:
+    def __init__(self, size):
+        self.size = size
+
+        # Инициализация матрицы доски
+        self.checkers = [[Checker() for x in range(self.size)] for y in range(self.size)]
+
+        # Инициализация начальных позиций пешек
+        for y in range(self.size):
+            for x in range(self.size):
+                if (y + x) % 2:
+                    if y < 2:
+                        self.checkers[y][x].type = CheckerType.BLACK_STANDARD
+                    elif y >= self.size - 2:
+                        self.checkers[y][x].type = CheckerType.WHITE_STANDARD
+
+    # Метод копирования доски
+    @classmethod
+    def copy(cls, field_instance):
+        field_copy = cls(field_instance.size)
+
+        for y in range(field_instance.size):
+            for x in range(field_instance.size):
+                field_copy.at(x, y).type = field_instance.type_at(x, y)
+
+        return field_copy
+
+    # Тип шашки по координатам
+    def type_at(self, x, y):
+        return self.checkers[y][x].type
+
+    # Шашка по координатам
+    def at(self, x, y):
+        return self.checkers[y][x]
+
+    # Находится ли точка в пределах доски
+    def is_within(self, x, y):
+        return 0 <= x < self.size and 0 <= y < self.size
+
+    # Счет белых
+    def white_score(self):
+        score = 0
+        for row in self.checkers:
+            for checker in row:
+                if checker.type == CheckerType.WHITE_STANDARD:
+                    score += 1
+                elif checker.type == CheckerType.WHITE_QUEEN:
+                    score += 3
+        return score
+
+    # Счет черных
+    def black_score(self):
+        score = 0
+        for row in self.checkers:
+            for checker in row:
+                if checker.type == CheckerType.BLACK_STANDARD:
+                    score += 1
+                elif checker.type == CheckerType.BLACK_QUEEN:
+                    score += 3
+        return score
+
+
+# Класс хода
+class Move:
+    def __init__(self, from_x=-1, from_y=-1, to_x=-1, to_y=-1):
+        self.from_x = from_x
+        self.from_y = from_y
+        self.to_x = to_x
+        self.to_y = to_y
+
+    def __eq__(self, other):
+        return (self.from_x == other.from_x and
+                self.from_y == other.from_y and
+                self.to_x == other.to_x and
+                self.to_y == other.to_y)
+
+
+# Класс игры
+class MakIek(tk.Tk):
+    def __init__(self):
+        super().__init__()
+
+        self.white = ImageTk.PhotoImage(Image.open(r"Images\white.png").resize((80, 80)))
+        self.whiteq = ImageTk.PhotoImage(Image.open(r"Images\whiteq.png").resize((80, 80)))
+        self.dark = ImageTk.PhotoImage(Image.open(r"Images\dark.png").resize((80, 80)))
+        self.darkq = ImageTk.PhotoImage(Image.open(r"Images\darkq.png").resize((80, 80)))
+
+        self.title("MakIek")
+
+        self.button_matrix = []
+
+        # Инициализация кнопок
+        for i in range(8):
+            row_buttons = []
+            for j in range(8):
+                button = tk.Button(self, text="",
+                                   command=lambda i=i, j=j: self.button_click(i, j),
+                                   width=11,
+                                   height=5)
+                button.grid(row=i,
+                            column=j,
+                            padx=0,
+                            pady=0)
+                row_buttons.append(button)
+            self.button_matrix.append(row_buttons)
+
+        self.restartBtn = tk.Button(self,
+                                    text="Перезапустить",
+                                    command=lambda: self.restart_game(),
+                                    width=11, height=2)
+        self.restartBtn.grid(row=8, column=0, padx=0, pady=3)
+
+        self.restart_game()
+
+    # Перезапуск игры
+    def restart_game(self):
+        self.field = Field(8)
+        self.player_turn = True
+        self.hovered_cell = Point()
+        self.selected_cell = Point()
+        self.animated_cell = Point()
+        self.update_buttons()
+
+    # Обновление текста кнопок
+    def update_buttons(self):
+        for i in range(8):
+            for j in range(8):
+                if i % 2 == 0 and j % 2 == 0 or i % 2 != 0 and j % 2 != 0:
+                    bg = "#F0F0F0"
+                else:
+                    bg = "#3D3D3D"
+                symbol = self.field.at(j, i).symbol()
+                if symbol == "w":
+                    image = self.white
+                elif symbol == "W":
+                    image = self.whiteq
+                elif symbol == "b":
+                    image = self.dark
+                elif symbol == "B":
+                    image = self.darkq
+                else:
+                    moves = self.get_moves_list(SideType.WHITE)
+                    if Move(self.selected_cell.x, self.selected_cell.y, j, i) in moves:
+                        self.button_matrix[i][j].config(height=5, width=11, image='', bg="#ADDFB3")
+                    else:
+                        self.button_matrix[i][j].config(height=5, width=11, image='', bg=bg)
+                    continue
+                self.button_matrix[i][j].config(height=80, width=80, image=image, bg=bg)
+        self.update()
+
+    # Обработчик нажатий на кнопки доски
+    def button_click(self, i, j):
+        if not self.player_turn:
+            return
+
+        x, y = j, i
+
+        # Если произошло нажатие на белую пешку
+        if self.field.type_at(x, y) in WHITE_CHECKERS:
+            self.selected_cell = Point(x, y)
+            self.update_buttons()
+        # Выбрана позиция хода для выбранной пешки
+        elif self.player_turn:
+            move = Move(self.selected_cell.x, self.selected_cell.y, x, y)
+
+            if move in self.get_moves_list(SideType.WHITE):
+                self.handle_player_turn(move)
+                self.update_buttons()
+
+                if not self.player_turn:
+                    self.handle_bot_turn()
+                    self.update_buttons()
+                    self.check_for_game_over()
+
+    # Обработка хода
+    def handle_move(self, move):
+        # Изменение типа шашки по достижении противоположной стороны доски
+        if move.to_y == 0 and self.field.type_at(move.from_x, move.from_y) == CheckerType.WHITE_STANDARD:
+            self.field.at(move.from_x, move.from_y).type = CheckerType.WHITE_QUEEN
+        elif (move.to_y == self.field.size - 1 and self.field.type_at(move.from_x,
+                                                                      move.from_y) == CheckerType.BLACK_STANDARD):
+            self.field.at(move.from_x, move.from_y).type = CheckerType.BLACK_QUEEN
+
+        # Перестановка
+        self.field.at(move.to_x, move.to_y).type = self.field.type_at(move.from_x, move.from_y)
+        self.field.at(move.from_x, move.from_y).type = CheckerType.NONE
+
+        # Вектор направления движения пешки
+        dx = -1 if move.from_x < move.to_x else 1
+        dy = -1 if move.from_y < move.to_y else 1
+
+        has_killed_checker = False
+        x, y = move.to_x, move.to_y
+        # Пока не достигнута позиция хода
+        while x != move.from_x or y != move.from_y:
+            # Шаг
+            x += dx
+            y += dy
+            # Встречена пешка на пути
+            if self.field.type_at(x, y) != CheckerType.NONE:
+                self.field.at(x, y).type = CheckerType.NONE
+                has_killed_checker = True
+
+        return has_killed_checker
+
+    # Обработка хода игрока
+    def handle_player_turn(self, move):
+        self.player_turn = False
+
+        has_killed_checker = self.handle_move(move)
+
+        required_moves_list = list(
+            filter(lambda required_move: move.to_x == required_move.from_x and move.to_y == required_move.from_y,
+                   self.get_required_moves_list(SideType.WHITE)))
+
+        if has_killed_checker and required_moves_list:
+            self.player_turn = True
+
+        self.selected_cell = Point()
+
+    # Обработка хода бота
+    def handle_bot_turn(self):
+        self.player_turn = False
+
+        optimal_moves_list = self.get_minmax_moves(SideType.opposite(SideType.WHITE))
+
+        for move in optimal_moves_list:
+            self.handle_move(move)
+
+        self.player_turn = True
+
+    # Проверка на окончание игры
+    def check_for_game_over(self):
+        game_over = False
+
+        white_moves_list = self.get_moves_list(SideType.WHITE)
+        if not white_moves_list:
+            messagebox.showinfo('Конец игры', 'Чёрные выиграли')
+            game_over = True
+
+        black_moves_list = self.get_moves_list(SideType.BLACK)
+        if not black_moves_list:
+            messagebox.showinfo('Конец игры', 'Белые выиграли')
+            game_over = True
+
+        if game_over:
+            self.restart_game()
+
+    # Оптимальные ходы
+    def get_minmax_moves(self, side):
+        best_result = 0
+        optimal_moves = []
+        minmax_moves_list = self.get_minmax_moves_list(side)
+
+        # Есть оптимальные ходы
+        if minmax_moves_list:
+            field_copy = Field.copy(self.field)
+            # Перебор оптимальных ходов
+            for moves in minmax_moves_list:
+                for move in moves:
+                    # Имитация хода
+                    self.handle_move(move)
+
+                try:
+                    if side == SideType.WHITE:
+                        result = self.field.white_score() / self.field.black_score()
+                    elif side == SideType.BLACK:
+                        result = self.field.black_score() / self.field.white_score()
+                except ZeroDivisionError:
+                    result = inf
+
+                # Оценка
+                if result > best_result:
+                    best_result = result
+                    optimal_moves.clear()
+                    optimal_moves.append(moves)
+                elif result == best_result:
+                    optimal_moves.append(moves)
+
+                self.field = Field.copy(field_copy)
+
+        optimal_move = []
+        if optimal_moves:
+            for move in choice(optimal_moves):
+                if side == SideType.WHITE and self.field.type_at(move.from_x, move.from_y) in BLACK_CHECKERS:
+                    break
+                elif side == SideType.BLACK and self.field.type_at(move.from_x, move.from_y) in WHITE_CHECKERS:
+                    break
+
+                optimal_move.append(move)
+
+        return optimal_move
+
+    # Список оптимальных ходов
+    def get_minmax_moves_list(self, side, minmax_depth=0, all_moves_list=[], current_moves_list=[],
+                              required_moves_list=[]):
+        if current_moves_list:
+            all_moves_list.append(current_moves_list)
+        else:
+            all_moves_list.clear()
+
+        if required_moves_list:
+            moves_list = required_moves_list
+        else:
+            moves_list = self.get_moves_list(side)
+
+        # Есть ходы и максимальная глубина minmax функции еще не достигнута
+        if moves_list and minmax_depth < MINMAX_DEPTH:
+            field_copy = Field.copy(self.field)
+            # Перебор ходов
+            for move in moves_list:
+                has_killed_checker = self.handle_move(move)
+
+                required_moves_list = list(filter(
+                    lambda required_move: move.to_x == required_move.from_x and move.to_y == required_move.from_y,
+                    self.get_required_moves_list(side)))
+
+                # Рекурсивные вызовы для построения minmax дерева ходов
+                if has_killed_checker and required_moves_list:
+                    self.get_minmax_moves_list(side, minmax_depth, all_moves_list,
+                                               current_moves_list + [move], required_moves_list)
+                else:
+                    self.get_minmax_moves_list(SideType.opposite(side), minmax_depth + 1,
+                                               all_moves_list, current_moves_list + [move])
+
+                self.field = Field.copy(field_copy)
+
+        return all_moves_list
+
+    # Список всех ходов
+    def get_moves_list(self, side):
+        # Обязательные ходы
+        moves_list = self.get_required_moves_list(side)
+        # Нет обязательных ходов
+        if not moves_list:
+            # Обычные ходы
+            moves_list = self.get_optional_moves_list(side)
+        return moves_list
+
+    # Обязательные ходы (рубка)
+    def get_required_moves_list(self, side):
+        moves_list = []
+
+        # Выбор дружественных шашек
+        if side == SideType.WHITE:
+            friendly_checkers = WHITE_CHECKERS
+            enemy_checkers = BLACK_CHECKERS
+        elif side == SideType.BLACK:
+            friendly_checkers = BLACK_CHECKERS
+            enemy_checkers = WHITE_CHECKERS
+        else:
+            return moves_list
+
+        # Перебор всех координат доски
+        for y in range(self.field.size):
+            for x in range(self.field.size):
+                # Стандартная шашка
+                if self.field.type_at(x, y) == friendly_checkers[0]:
+                    for offset in MOVE_OFFSETS:
+                        # Рубка не по правилам
+                        if (side == SideType.WHITE and y <= y + offset.y or
+                                side == SideType.BLACK and y >= y + offset.y):
+                            continue
+                        # Выход за пределы доски
+                        if not (self.field.is_within(x + offset.x * 2, y + offset.y * 2)):
+                            continue
+                        # Рубка по правилам
+                        if self.field.type_at(x + offset.x, y + offset.y) in enemy_checkers and self.field.type_at(
+                                x + offset.x * 2, y + offset.y * 2) == CheckerType.NONE:
+                            moves_list.append(Move(x, y, x + offset.x * 2, y + offset.y * 2))
+                # Дамка
+                elif self.field.type_at(x, y) == friendly_checkers[1]:
+                    for offset in MOVE_OFFSETS:
+                        # Выход за пределы доски
+                        if not (self.field.is_within(x + offset.x * 2, y + offset.y * 2)):
+                            continue
+
+                        has_enemy_checker_on_way = False
+
+                        # Перебор пути дамки
+                        for shift in range(1, self.field.size):
+                            # Выход за пределы доски
+                            if not (self.field.is_within(x + offset.x * shift, y + offset.y * shift)):
+                                continue
+                            # Нет вражеской пешки на пути
+                            if not has_enemy_checker_on_way:
+                                # Найдена вражеская пешка
+                                if self.field.type_at(x + offset.x * shift, y + offset.y * shift) in enemy_checkers:
+                                    has_enemy_checker_on_way = True
+                                    continue
+                                # Найдена дружественная пешка
+                                elif (self.field.type_at(x + offset.x * shift,
+                                                         y + offset.y * shift) in friendly_checkers):
+                                    break
+                            # Есть вражеская пешка на пути
+                            if has_enemy_checker_on_way:
+                                # Найдена пустая позиция
+                                if (self.field.type_at(x + offset.x * shift,
+                                                       y + offset.y * shift) == CheckerType.NONE):
+                                    moves_list.append(Move(x, y, x + offset.x * shift, y + offset.y * shift))
+                                    break
+                                else:
+                                    break
+
+        return moves_list
+
+    # Обычные ходы (перемещение)
+    def get_optional_moves_list(self, side):
+        moves_list = []
+
+        # Выбор дружественных шашек
+        if side == SideType.WHITE:
+            friendly_checkers = WHITE_CHECKERS
+        elif side == SideType.BLACK:
+            friendly_checkers = BLACK_CHECKERS
+        else:
+            return moves_list
+
+        # Перебор всех координат доски
+        for y in range(self.field.size):
+            for x in range(self.field.size):
+                # Стандартная шашка
+                if self.field.type_at(x, y) == friendly_checkers[0]:
+                    for offset in MOVE_OFFSETS[:2] if side == SideType.WHITE else MOVE_OFFSETS[2:]:
+                        # Выход за пределы доски
+                        if not (self.field.is_within(x + offset.x, y + offset.y)):
+                            continue
+                        # Ход на пустую позицию
+                        if self.field.type_at(x + offset.x, y + offset.y) == CheckerType.NONE:
+                            moves_list.append(Move(x, y, x + offset.x, y + offset.y))
+                # Дамка
+                elif self.field.type_at(x, y) == friendly_checkers[1]:
+                    for offset in MOVE_OFFSETS:
+                        # Выход за пределы доски
+                        if not (self.field.is_within(x + offset.x, y + offset.y)):
+                            continue
+                        # Перебор пути дамки
+                        for shift in range(1, self.field.size):
+                            # Выход за пределы доски
+                            if not (self.field.is_within(x + offset.x * shift, y + offset.y * shift)):
+                                continue
+                            # Ход на пустую позицию
+                            if self.field.type_at(x + offset.x * shift, y + offset.y * shift) == CheckerType.NONE:
+                                moves_list.append(Move(x, y, x + offset.x * shift, y + offset.y * shift))
+                            else:
+                                break
+        return moves_list
+
+
+def register_user():
+    username = username_entry.get()
+    password = password_entry.get()
+
+    if username and password:
+        if user_exists(username):
+            messagebox.showerror("Ошибка регистрации", "Пользователь с таким именем уже существует.")
+        else:
+            save_user(username, password)
+            messagebox.showinfo("Регистрация успешна",
+                                "Регистрация прошла успешно. Пожалуйста, войдите с вашим именем и паролем.")
+            clear_entries()
+    else:
+        messagebox.showwarning("Ошибка регистрации", "Пожалуйста, заполните оба поля.")
+
+
+def login_user():
+    global isLogIn
+
+    username = username_entry.get()
+    password = password_entry.get()
+    if username and password:
+        if user_exists(username) and check_password(username, password):
+            messagebox.showinfo("Вход выполнен успешно", "Вход выполнен успешно.")
+            clear_entries()
+            isLogIn = True
+            root.destroy()
+        else:
+            messagebox.showerror("Ошибка входа", "Ошибка входа. Пожалуйста, проверьте ваше имя пользователя и пароль.")
+    else:
+        messagebox.showwarning("Ошибка входа", "Пожалуйста, заполните оба поля.")
+
+
+def clear_entries():
+    username_entry.delete(0, tk.END)
+    password_entry.delete(0, tk.END)
+
+
+def user_exists(username):
+    if check_file_exist():
+        with open("users.txt", "r") as file:
+            for line in file:
+                if username == line.strip().split(':')[0]:
+                    return True
+        return False
+
+
+def check_password(username, password):
+    if check_file_exist():
+        with open("users.txt", "r") as file:
+            for line in file:
+                if line.strip().split(':')[0] == username:
+                    if line.strip().split(':')[1] == password:
+                        return True
+        return False
+
+
+def check_file_exist():
+    if not os.path.isfile("users.txt"):
+        choice = messagebox.askyesno(
+            "Ошибка!", " Отсутствует 'users.txt' файл. Хотите создать его?")
+        if choice:
+            with open("users.txt", "w"):
+                pass
+        else:
+            exit()
+    return True
+
+
+def save_user(username, password):
+    with open("users.txt", "a") as file:
+        file.write(f"{username}:{password}\n")
+
+
+if __name__ == "__main__":
+    isLogIn = False
+
+    root = tk.Tk()
+    root.title("Авторизация")
+    root.geometry("450x250")
+    root.resizable(width=False, height=False)
+    root['bg'] = 'black'
+
+    main_label = tk.Label(root, text='Авторизация', font='Arial 15 bold', bg='black', fg='white')
+    main_label.pack()
+
+    username_label = tk.Label(root, text="имя пользователя", font='Arial 11 bold', bg='black', fg='white', padx=10,
+                              pady=8)
+    username_label.pack()
+
+    username_entry = tk.Entry(root, bg='black', fg='Lime', font='Arial 12 bold')
+    username_entry.pack()
+
+    password_label = tk.Label(root, text="пароль", font='Arial 11 bold', bg='black', fg='white', padx=10, pady=8)
+    password_label.pack()
+
+    password_entry = tk.Entry(root, bg='black', fg='Lime', font='Arial 12 bold', show='*')
+    password_entry.pack()
+
+    register_button = tk.Button(root, text="Зарегистрироваться", font='Arial 11 bold', bg='black', fg='white',
+                                command=register_user)
+    register_button.pack(anchor=tk.CENTER, pady=10)
+
+    login_button = tk.Button(root, text="Войти", font='Arial 11 bold', bg='black', fg='white', command=login_user)
+    login_button.pack(anchor=tk.CENTER)
+
+    root.mainloop()
+
+    if (isLogIn):
+        app = MakIek()
+        app.mainloop()
