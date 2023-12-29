@@ -1,9 +1,9 @@
 import os
-import tkinter as tk  # Библиотека для реализации интерфейса
+import tkinter as tk 
 from tkinter import messagebox
-from enum import auto, Enum  # Библиотека для реализации перечислений
+from enum import auto, Enum  
 from math import inf
-from random import choice  # Библиотека для реализации случайного выбора
+from random import choice 
 
 from PIL import ImageTk
 from PIL import Image
